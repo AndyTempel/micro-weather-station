@@ -1,4 +1,5 @@
 """ML Model Trainer for Micro Weather Station using pure Python implementation."""
+
 # bandit: skipfile
 
 import datetime
