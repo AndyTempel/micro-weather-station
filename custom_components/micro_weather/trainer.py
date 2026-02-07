@@ -2,14 +2,9 @@
 
 import datetime
 import logging
-import os
 from typing import Any, Dict
 
-from homeassistant.core import HomeAssistant
-from homeassistant.helpers import (
-    device_registry as dr,
-    entity_registry as er,
-)
+from homeassistant.core import HomeAssistant, State
 from homeassistant.util import dt as dt_util
 
 from .const import (
@@ -24,16 +19,17 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 
-def train_model(hass: HomeAssistant, sensor_map: Dict[str, str], model_path: str) -> Dict[str, Any]:
+def train_model(
+    hass: HomeAssistant, sensor_map: Dict[str, str], model_path: str
+) -> Dict[str, Any]:
     """Train the weather model using historical data.
 
     This function runs in the executor thread.
     """
-    import numpy as np
-    import pandas as pd
-    import joblib
-    from sklearn.ensemble import RandomForestClassifier
     from homeassistant.components.recorder import history
+    import joblib
+    import pandas as pd
+    from sklearn.ensemble import RandomForestClassifier
 
     _LOGGER.info("Starting ML model training for Micro Weather Station")
 
@@ -44,7 +40,7 @@ def train_model(hass: HomeAssistant, sensor_map: Dict[str, str], model_path: str
     # We need specific sensors for the 9 features requested:
     # 1. Temp, 2. Humidity, 3. Pressure, 4. Solar, 5. Wind
     # And we need Rain for the target.
-    
+
     required_keys = [
         CONF_OUTDOOR_TEMP_SENSOR,
         CONF_HUMIDITY_SENSOR,
@@ -65,10 +61,14 @@ def train_model(hass: HomeAssistant, sensor_map: Dict[str, str], model_path: str
         key_to_entity[key] = entity_id
 
     _LOGGER.debug("Fetching history for entities: %s", entity_ids)
-    
+
     # get_significant_states returns a dict {entity_id: [states]}
     hist_data = history.get_significant_states(
-        hass, start_time, end_time, entity_ids=entity_ids, significant_changes_only=False
+        hass,
+        start_time,
+        end_time,
+        entity_ids=entity_ids,
+        significant_changes_only=False,
     )
 
     dfs = []
@@ -77,15 +77,17 @@ def train_model(hass: HomeAssistant, sensor_map: Dict[str, str], model_path: str
         if not states:
             _LOGGER.warning("No history found for %s", entity_id)
             continue
-        
+
         data = []
         for state in states:
+            if not isinstance(state, State):
+                continue
             try:
                 val = float(state.state)
                 data.append({"timestamp": state.last_updated, key: val})
             except (ValueError, TypeError):
                 continue
-        
+
         if data:
             df_s = pd.DataFrame(data)
             df_s["timestamp"] = pd.to_datetime(df_s["timestamp"], utc=True)
@@ -95,7 +97,11 @@ def train_model(hass: HomeAssistant, sensor_map: Dict[str, str], model_path: str
             dfs.append(df_s)
 
     if len(dfs) < len(required_keys):
-        _LOGGER.error("Insufficient data sources for training. Found %d/%d", len(dfs), len(required_keys))
+        _LOGGER.error(
+            "Insufficient data sources for training. Found %d/%d",
+            len(dfs),
+            len(required_keys),
+        )
         return {"success": False, "error": "Insufficient data sources"}
 
     # 2. Merge & Feature Engineering
@@ -109,7 +115,7 @@ def train_model(hass: HomeAssistant, sensor_map: Dict[str, str], model_path: str
 
     # Feature Engineering (Matching the 9 features requested)
     # Order: Temp, Hum, Pres, Solar, Wind, PresTrend1h, PresDelta3h, HumTrend1h, SolarDrop1h
-    
+
     # Trends (resampled to 15min, so 1h = 4 steps, 3h = 12 steps)
     df["pressure_trend_1h"] = df[CONF_PRESSURE_SENSOR].diff(4)
     df["pressure_delta_3h"] = df[CONF_PRESSURE_SENSOR].diff(12)
@@ -118,9 +124,9 @@ def train_model(hass: HomeAssistant, sensor_map: Dict[str, str], model_path: str
 
     # Target: Will it rain in the next 45 minutes? (3 * 15min steps)
     df["target"] = (df[CONF_RAIN_RATE_SENSOR].shift(-3) > 0).astype(int)
-    
+
     df = df.dropna()
-    
+
     if df.empty:
         _LOGGER.error("Not enough data points after feature engineering")
         return {"success": False, "error": "Insufficient data points"}
@@ -136,7 +142,9 @@ def train_model(hass: HomeAssistant, sensor_map: Dict[str, str], model_path: str
 
     _LOGGER.info(
         "Distribution -> Stable: %d, Continuation: %d, Onset: %d",
-        len(df_stable), len(df_continuation), len(df_onset)
+        len(df_stable),
+        len(df_continuation),
+        len(df_onset),
     )
 
     n_rain_events = len(df_onset) + len(df_continuation)
@@ -145,7 +153,9 @@ def train_model(hass: HomeAssistant, sensor_map: Dict[str, str], model_path: str
     if len(df_stable) > n_keep_stable:
         df_stable = df_stable.sample(n=n_keep_stable, random_state=42)
 
-    df_balanced = pd.concat([df_onset, df_continuation, df_stable]).sample(frac=1, random_state=42)
+    df_balanced = pd.concat([df_onset, df_continuation, df_stable]).sample(
+        frac=1, random_state=42
+    )
 
     # 4. Training
     feature_cols = [
@@ -175,10 +185,13 @@ def train_model(hass: HomeAssistant, sensor_map: Dict[str, str], model_path: str
 
         # Save model
         joblib.dump(clf, model_path)
-        
+
         accuracy = clf.score(X, y)
-        importances = dict(zip(feature_cols, clf.feature_importances_.round(2)))
-        
+        importances = {
+            feature: float(importance)
+            for feature, importance in zip(feature_cols, clf.feature_importances_)
+        }
+
         _LOGGER.info("Model training successful. Accuracy: %.2f", accuracy)
         _LOGGER.debug("Feature importances: %s", importances)
 
@@ -186,7 +199,7 @@ def train_model(hass: HomeAssistant, sensor_map: Dict[str, str], model_path: str
             "success": True,
             "accuracy": accuracy,
             "last_trained": datetime.datetime.now().isoformat(),
-            "feature_importances": importances
+            "feature_importances": importances,
         }
 
     except Exception as err:

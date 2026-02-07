@@ -1,5 +1,7 @@
 """Binary sensor platform for Micro Weather Station."""
 
+import typing
+
 from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
     BinarySensorEntity,
@@ -12,6 +14,9 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import DOMAIN
 from .version import __version__
 
+if typing.TYPE_CHECKING:
+    from . import MicroWeatherCoordinator
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -19,7 +24,7 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the Micro Weather Station binary sensor entities."""
-    coordinator = hass.data[DOMAIN][config_entry.entry_id]
+    coordinator: MicroWeatherCoordinator = hass.data[DOMAIN][config_entry.entry_id]
 
     async_add_entities([MicroWeatherAISensor(coordinator, config_entry)])
 
@@ -27,11 +32,15 @@ async def async_setup_entry(
 class MicroWeatherAISensor(CoordinatorEntity, BinarySensorEntity):
     """Binary sensor to indicate if AI model is active."""
 
+    coordinator: "MicroWeatherCoordinator"
+
     _attr_has_entity_name = True
     _attr_name = "AI Active"
     _attr_device_class = BinarySensorDeviceClass.RUNNING
 
-    def __init__(self, coordinator, config_entry):
+    def __init__(
+        self, coordinator: "MicroWeatherCoordinator", config_entry: ConfigEntry
+    ):
         """Initialize the sensor."""
         super().__init__(coordinator)
         self._config_entry = config_entry

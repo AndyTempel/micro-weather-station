@@ -3,7 +3,13 @@
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.micro_weather.const import DOMAIN
+from custom_components.micro_weather.const import (
+    CONF_ENABLE_ML,
+    CONF_HUMIDITY_SENSOR,
+    CONF_OUTDOOR_TEMP_SENSOR,
+    CONF_UPDATE_INTERVAL,
+    DOMAIN,
+)
 
 
 @pytest.fixture
@@ -11,12 +17,13 @@ def mock_config_entry():
     """Create a mock config entry."""
     return MockConfigEntry(
         domain=DOMAIN,
-        data={
-            "outdoor_temp_sensor": "sensor.outdoor_temperature",
-            "humidity_sensor": "sensor.humidity",
-            "update_interval": 30,
+        data={},
+        options={
+            CONF_OUTDOOR_TEMP_SENSOR: "sensor.outdoor_temperature",
+            CONF_HUMIDITY_SENSOR: "sensor.humidity",
+            CONF_UPDATE_INTERVAL: 30,
+            CONF_ENABLE_ML: False,
         },
-        options={},
         entry_id="test_entry_id",
         title="Micro Weather Station Test",
     )

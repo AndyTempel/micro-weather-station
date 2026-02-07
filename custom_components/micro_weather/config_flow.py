@@ -173,15 +173,16 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
         config_entry: config_entries.ConfigEntry,
     ) -> config_entries.OptionsFlow:
         """Create the options flow."""
-        return OptionsFlowHandler()
+        return OptionsFlowHandler(config_entry)
 
 
 class OptionsFlowHandler(config_entries.OptionsFlow):
     """Handle options flow for Micro Weather Station."""
 
-    def __init__(self):
+    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
         """Initialize the options flow."""
-        self._data = {}
+        self._data: dict[str, Any] = {}
+        self._config_entry = config_entry
 
     def _get_default_altitude(self) -> float:
         """Get the default altitude in the appropriate unit for the HA system."""
@@ -248,7 +249,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 self._data.update(user_input)
 
                 # Save changes immediately
-                options = dict(self.config_entry.options)
+                options = dict(self._config_entry.options)
                 for field in user_input:
                     value = user_input[field]
                     # Handle different field types appropriately
@@ -265,13 +266,13 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                         else:
                             options[field] = None
                 self.hass.config_entries.async_update_entry(
-                    self.config_entry, options=options
+                    self._config_entry, options=options
                 )
 
                 return await self.async_step_init()
 
         # Get current options for defaults
-        current_options = dict(self.config_entry.options)
+        current_options = dict(self._config_entry.options)
 
         # Build atmospheric sensors schema
         schema_dict: dict[Any, Any] = {}
@@ -352,7 +353,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             self._data.update(user_input)
 
             # Save changes immediately
-            options = dict(self.config_entry.options)
+            options = dict(self._config_entry.options)
             for field in user_input:
                 value = user_input[field]
                 if value and value not in ("", "None"):
@@ -360,13 +361,13 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 else:
                     options[field] = None
             self.hass.config_entries.async_update_entry(
-                self.config_entry, options=options
+                self._config_entry, options=options
             )
 
             return await self.async_step_init()
 
         # Get current options for defaults
-        current_options = self.config_entry.options
+        current_options = self._config_entry.options
 
         # Build wind sensors schema
         schema_dict: dict[Any, Any] = {}
@@ -418,7 +419,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             self._data.update(user_input)
 
             # Save changes immediately
-            options = dict(self.config_entry.options)
+            options = dict(self._config_entry.options)
             for field in user_input:
                 value = user_input[field]
                 if value and value not in ("", "None"):
@@ -426,13 +427,13 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 else:
                     options[field] = None
             self.hass.config_entries.async_update_entry(
-                self.config_entry, options=options
+                self._config_entry, options=options
             )
 
             return await self.async_step_init()
 
         # Get current options for defaults
-        current_options = self.config_entry.options
+        current_options = self._config_entry.options
 
         # Build rain sensors schema
         schema_dict: dict[Any, Any] = {}
@@ -474,7 +475,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             ]
 
             # Only include zenith_max_radiation in optional fields if solar radiation sensor is configured
-            if self.config_entry.options.get(
+            if self._config_entry.options.get(
                 CONF_SOLAR_RADIATION_SENSOR
             ) or user_input.get(CONF_SOLAR_RADIATION_SENSOR):
                 optional_fields.append(CONF_ZENITH_MAX_RADIATION)
@@ -485,7 +486,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             self._data.update(user_input)
 
             # Save changes immediately
-            options = dict(self.config_entry.options)
+            options = dict(self._config_entry.options)
             for field in user_input:
                 value = user_input[field]
                 if value and value not in ("", "None"):
@@ -493,13 +494,13 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 else:
                     options[field] = None
             self.hass.config_entries.async_update_entry(
-                self.config_entry, options=options
+                self._config_entry, options=options
             )
 
             return await self.async_step_init()
 
         # Get current options for defaults
-        current_options = self.config_entry.options
+        current_options = self._config_entry.options
 
         # Check if solar radiation sensor is configured
         has_solar_radiation = bool(current_options.get(CONF_SOLAR_RADIATION_SENSOR))
@@ -568,7 +569,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 self._data.update(user_input)
 
                 # Build new options dict from current options and accumulated data
-                options = dict(self.config_entry.options)
+                options = dict(self._config_entry.options)
 
                 # Process all sensor fields from accumulated data
                 all_sensor_fields = [
@@ -608,15 +609,15 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 # Always update the interval and ML enablement
                 update_interval = self._data.get(
                     CONF_UPDATE_INTERVAL,
-                    self.config_entry.options.get(
+                    self._config_entry.options.get(
                         CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL
                     ),
                 )
                 options[CONF_UPDATE_INTERVAL] = update_interval
-                
+
                 enable_ml = self._data.get(
                     CONF_ENABLE_ML,
-                    self.config_entry.options.get(CONF_ENABLE_ML, False),
+                    self._config_entry.options.get(CONF_ENABLE_ML, False),
                 )
                 options[CONF_ENABLE_ML] = enable_ml
 
@@ -627,7 +628,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 errors["base"] = "unknown"
 
         # Get current options for defaults
-        current_options = self.config_entry.options
+        current_options = self._config_entry.options
 
         # Build final schema with update interval
         data_schema = vol.Schema(

@@ -17,14 +17,13 @@ from collections import deque
 from datetime import timedelta
 import logging
 import os
-from typing import Any
-
-import joblib
+from typing import Any, cast
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+import joblib
 
 from .const import (
     CONF_ENABLE_ML,
@@ -84,13 +83,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             _LOGGER.warning("ML training requested but ML is disabled in configuration")
             return
 
-        model_path = hass.config.path("custom_components/micro_weather/weather_model.joblib")
-        
+        model_path = hass.config.path(
+            "custom_components/micro_weather/weather_model.joblib"
+        )
+
         from .trainer import train_model
-        
+
         # Execute training in executor thread
+        # Cast options to dict[str, str] as trainer expects it
+        sensor_map = cast(dict[str, str], dict(entry.options))
         result = await hass.async_add_executor_job(
-            train_model, hass, entry.options, model_path
+            train_model, hass, sensor_map, model_path
         )
 
         if result.get("success"):
@@ -171,13 +174,14 @@ class MicroWeatherCoordinator(DataUpdateCoordinator):
             hass: Home Assistant instance
             entry: Configuration entry with sensor mappings and settings
         """
-        self.entry = entry
         super().__init__(
             hass,
             _LOGGER,
             name=DOMAIN,
             update_interval=timedelta(minutes=5),
+            config_entry=entry,
         )
+        self.entry = entry
         self.ml_active = False
         self.ml_model_loaded = False
         self._ml_model = None
@@ -225,7 +229,9 @@ class MicroWeatherCoordinator(DataUpdateCoordinator):
                     joblib.load, model_path
                 )
                 self.ml_model_loaded = True
-                _LOGGER.info("Successfully reloaded ML weather model from %s", model_path)
+                _LOGGER.info(
+                    "Successfully reloaded ML weather model from %s", model_path
+                )
             except Exception as err:
                 _LOGGER.error("Failed to reload ML weather model: %s", err)
         else:

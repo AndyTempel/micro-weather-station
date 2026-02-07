@@ -4,7 +4,7 @@ from collections import deque
 from datetime import datetime, timedelta
 import json
 import logging
-from typing import Any, Dict, Mapping, Optional
+from typing import Any, Dict, Mapping, Optional, cast
 
 from homeassistant.const import STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import HomeAssistant
@@ -17,7 +17,6 @@ from .analysis.trends import TrendsAnalyzer
 from .const import (
     CONF_ALTITUDE,
     CONF_DEWPOINT_SENSOR,
-    CONF_ENABLE_ML,
     CONF_HUMIDITY_SENSOR,
     CONF_OUTDOOR_TEMP_SENSOR,
     CONF_PRESSURE_SENSOR,
@@ -57,9 +56,7 @@ from .const import (
     KEY_WIND_GUST_UNIT,
     KEY_WIND_SPEED,
     KEY_WIND_SPEED_UNIT,
-    PRESSURE_HPA_UNIT,
     PRESSURE_HPA_UNITS,
-    PRESSURE_INHG_UNIT,
     PRESSURE_INHG_UNITS,
     PRESSURE_PSI_UNIT,
     PRESSURE_PSI_UNITS,
@@ -479,7 +476,10 @@ class WeatherDetector:
 
         Scans the deque for the reading closest to the target timestamp.
         """
-        if sensor_key not in self._sensor_history or not self._sensor_history[sensor_key]:
+        if (
+            sensor_key not in self._sensor_history
+            or not self._sensor_history[sensor_key]
+        ):
             return None
 
         target_time = datetime.now() - timedelta(hours=hours_ago)
@@ -533,10 +533,15 @@ class WeatherDetector:
                 return None
 
             # Calculate differences
-            press_trend_1h = pres - p_1h
-            press_delta_3h = pres - p_3h
-            hum_trend_1h = hum - h_1h
-            solar_drop_1h = solar - s_1h
+            # mypy: we already checked for None above
+            assert pres is not None
+            assert solar is not None
+            assert hum is not None
+
+            press_trend_1h = pres - cast(float, p_1h)
+            press_delta_3h = pres - cast(float, p_3h)
+            hum_trend_1h = hum - cast(float, h_1h)
+            solar_drop_1h = solar - cast(float, s_1h)
 
             # Prepare feature vector
             features = [
