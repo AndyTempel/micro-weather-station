@@ -72,20 +72,20 @@ Choose one of these options:
 
 **Option A: Download Release (Stable)**
 
-1. Go to [GitHub Releases](https://github.com/caplaz/micro-weather-station/releases)
+1. Go to [GitHub Releases](https://github.com/AndyTempel/micro-weather-station/releases)
 2. Download the latest release ZIP file
 3. Extract the ZIP file on your computer
 
 **Option B: Download Source (Latest)**
 
-1. Go to the [GitHub repository](https://github.com/caplaz/micro-weather-station)
+1. Go to the [GitHub repository](https://github.com/AndyTempel/micro-weather-station)
 2. Click "Code" → "Download ZIP"
 3. Extract the ZIP file on your computer
 
 **Option C: Git Clone (Advanced)**
 
 ```bash
-git clone https://github.com/caplaz/micro-weather-station.git
+git clone https://github.com/AndyTempel/micro-weather-station.git
 cd micro-weather-station
 ```
 
@@ -427,7 +427,7 @@ If you encounter issues:
 1. **Check Logs**: Settings → System → Logs
 2. **Review Entity States**: Developer Tools → States
 3. **Verify Sensor Data**: Ensure your sensors are working
-4. **Search Issues**: Check [GitHub Issues](https://github.com/caplaz/micro-weather-station/issues)
+4. **Search Issues**: Check [GitHub Issues](https://github.com/AndyTempel/micro-weather-station/issues)
 5. **Ask for Help**: [Home Assistant Community](https://community.home-assistant.io/)
 
 ---

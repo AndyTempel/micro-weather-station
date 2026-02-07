@@ -1,14 +1,14 @@
 {
   "domain": "micro_weather",
   "name": "Micro Weather Station",
-  "codeowners": ["@caplaz"],
+  "codeowners": ["@caplaz", "@AndyTempel"],
   "config_flow": true,
-  "dependencies": [],
-  "documentation": "https://github.com/caplaz/micro-weather-station",
+  "dependencies": ["recorder"],
+  "documentation": "https://github.com/AndyTempel/micro-weather-station",
   "integration_type": "device",
   "iot_class": "calculated",
-  "issue_tracker": "https://github.com/caplaz/micro-weather-station/issues",
+  "issue_tracker": "https://github.com/AndyTempel/micro-weather-station/issues",
   "loggers": ["custom_components.micro_weather"],
-  "requirements": ["voluptuous>=0.13.1"],
+  "requirements": ["voluptuous>=0.13.1", "joblib>=1.2.0", "scikit-learn>=1.2.0"],
   "version": "4.1.2"
 }

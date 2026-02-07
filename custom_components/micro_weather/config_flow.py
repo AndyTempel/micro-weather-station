@@ -13,6 +13,7 @@ import voluptuous as vol
 from .const import (
     CONF_ALTITUDE,
     CONF_DEWPOINT_SENSOR,
+    CONF_ENABLE_ML,
     CONF_HUMIDITY_SENSOR,
     CONF_OUTDOOR_TEMP_SENSOR,
     CONF_PRESSURE_SENSOR,
@@ -157,6 +158,7 @@ class ConfigFlowHandler(ConfigFlow, domain=DOMAIN):
                         min=1, max=60, step=1, unit_of_measurement="min"
                     )
                 ),
+                vol.Optional(CONF_ENABLE_ML, default=False): selector.BooleanSelector(),
             }
         )
 
@@ -603,7 +605,7 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                             else:
                                 options[field] = None
 
-                # Always update the interval
+                # Always update the interval and ML enablement
                 update_interval = self._data.get(
                     CONF_UPDATE_INTERVAL,
                     self.config_entry.options.get(
@@ -611,6 +613,12 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                     ),
                 )
                 options[CONF_UPDATE_INTERVAL] = update_interval
+                
+                enable_ml = self._data.get(
+                    CONF_ENABLE_ML,
+                    self.config_entry.options.get(CONF_ENABLE_ML, False),
+                )
+                options[CONF_ENABLE_ML] = enable_ml
 
                 return self.async_create_entry(title="", data=options)
 
@@ -634,6 +642,10 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                         min=1, max=60, step=1, unit_of_measurement="min"
                     )
                 ),
+                vol.Optional(
+                    CONF_ENABLE_ML,
+                    default=current_options.get(CONF_ENABLE_ML, False),
+                ): selector.BooleanSelector(),
             }
         )
 

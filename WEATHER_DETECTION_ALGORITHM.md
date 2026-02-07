@@ -11,13 +11,39 @@ The weather detection system uses a sophisticated modular architecture with spec
 The detection subsystem is organized into specialized modules:
 
 1. **Core Condition Analyzer** (`analysis/core.py`): Priority-based weather condition determination
-2. **Atmospheric Analyzer** (`analysis/atmospheric.py`): Pressure systems, fog detection, and storm probability
-3. **Solar Analyzer** (`analysis/solar.py`): Cloud cover analysis using solar radiation
-4. **Trends Analyzer** (`analysis/trends.py`): Historical data analysis and pattern recognition
+2. **ML Engine** (`weather_detector.py`): Scikit-learn based Random Forest classifier (Optional)
+3. **Atmospheric Analyzer** (`analysis/atmospheric.py`): Pressure systems, fog detection, and storm probability
+4. **Solar Analyzer** (`analysis/solar.py`): Cloud cover analysis using solar radiation
+5. **Trends Analyzer** (`analysis/trends.py`): Historical data analysis and pattern recognition
 
-The main coordination is handled by `weather_analysis.py`, which orchestrates these specialized analyzers, and `weather_detector.py`, which combines analysis with forecasting to provide complete weather information.
+The main coordination is handled by `weather_detector.py`, which orchestrates these specialized analyzers and the ML engine.
 
 _For version-specific improvements and changes, see the [CHANGELOG](CHANGELOG.md)._
+
+## Machine Learning Engine (ML)
+
+The ML Engine uses a Random Forest classifier trained on your local historical data to predict weather conditions. This is particularly effective at predicting the onset of precipitation based on microclimate trends.
+
+### ML Feature Vector
+
+The model expects exactly 9 features:
+1. **Temperature** (Raw value)
+2. **Humidity** (Raw value)
+3. **Pressure** (Raw value)
+4. **Solar Irradiance** (Raw value)
+5. **Wind Speed** (Raw value)
+6. **Pressure Trend (1h)**: Difference between now and 1 hour ago.
+7. **Pressure Delta (3h)**: Difference between now and 3 hours ago.
+8. **Humidity Trend (1h)**: Difference between now and 1 hour ago.
+9. **Solar Drop (1h)**: Difference between now and 1 hour ago.
+
+### Training Logic
+
+The training process (`trainer.py`) fetches 30 days of historical data from the Home Assistant recorder. It automatically balances the dataset by undersampling stable weather to focus on "onset" events (transitions to rain).
+
+### Inference & Fallback
+
+When enabled, the ML Engine is prioritized. If the model is loaded and sufficient history exists (1h/3h), the engine performs inference. If ML is disabled, the model is missing, or the history buffer is still filling (Cold Start), the system falls back to the static priority-based algorithm.
 
 ## Module Responsibilities
 

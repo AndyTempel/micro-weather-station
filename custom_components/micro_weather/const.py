@@ -9,6 +9,7 @@ CONF_PRESSURE_RANGE = "pressure_range"
 CONF_WIND_SPEED_RANGE = "wind_speed_range"
 CONF_UPDATE_INTERVAL = "update_interval"
 CONF_WEATHER_PATTERNS = "weather_patterns"
+CONF_ENABLE_ML = "enable_ml"
 
 # Sensor entity configuration
 CONF_OUTDOOR_TEMP_SENSOR = "outdoor_temp_sensor"

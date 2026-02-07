@@ -1,7 +1,7 @@
 """Weather condition detector for Micro Weather Station."""
 
 from collections import deque
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 import logging
 from typing import Any, Dict, Mapping, Optional
@@ -17,6 +17,7 @@ from .analysis.trends import TrendsAnalyzer
 from .const import (
     CONF_ALTITUDE,
     CONF_DEWPOINT_SENSOR,
+    CONF_ENABLE_ML,
     CONF_HUMIDITY_SENSOR,
     CONF_OUTDOOR_TEMP_SENSOR,
     CONF_PRESSURE_SENSOR,
@@ -97,32 +98,44 @@ class WeatherDetector:
         sensors: Dictionary mapping sensor types to entity IDs
     """
 
-    def __init__(self, hass: HomeAssistant, options: Mapping[str, Any]) -> None:
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        options: Mapping[str, Any],
+        sensor_history: Optional[Dict[str, deque[Dict[str, Any]]]] = None,
+        ml_model: Any = None,
+        enable_ml: bool = False,
+    ) -> None:
         """Initialize the weather detector.
 
         Args:
             hass: Home Assistant instance for accessing entity states
             options: Configuration mapping sensor types to entity IDs
+            sensor_history: Persistent historical data storage
+            ml_model: Loaded scikit-learn model for inference
+            enable_ml: Whether ML is enabled in options
         """
         self.hass = hass
         self.options = options
+        self._ml_model = ml_model
+        self._enable_ml = enable_ml
+        self._ml_active = False
         self._last_condition = "partly_cloudy"
         self._condition_start_time = datetime.now()
 
-        # Historical data storage (last 48 hours, 15-minute intervals =
-        # ~192 readings)
-        self._history_maxlen = 192  # 48 hours * 4 readings per hour
-        self._sensor_history: Dict[str, deque[Dict[str, Any]]] = {
-            KEY_OUTDOOR_TEMP: deque(maxlen=self._history_maxlen),
-            KEY_HUMIDITY: deque(maxlen=self._history_maxlen),
-            KEY_PRESSURE: deque(maxlen=self._history_maxlen),
-            KEY_WIND_SPEED: deque(maxlen=self._history_maxlen),
-            KEY_WIND_DIRECTION: deque(maxlen=self._history_maxlen),
-            KEY_SOLAR_RADIATION: deque(maxlen=self._history_maxlen),
-            KEY_RAIN_RATE: deque(maxlen=self._history_maxlen),
+        # Use provided history or initialize if missing (fallback)
+        self._sensor_history = sensor_history or {
+            KEY_OUTDOOR_TEMP: deque(maxlen=192),
+            KEY_HUMIDITY: deque(maxlen=192),
+            KEY_PRESSURE: deque(maxlen=192),
+            KEY_WIND_SPEED: deque(maxlen=192),
+            KEY_WIND_DIRECTION: deque(maxlen=192),
+            KEY_SOLAR_RADIATION: deque(maxlen=192),
+            KEY_RAIN_RATE: deque(maxlen=192),
+            "condition_history": deque(maxlen=192),
         }
-        self._condition_history: deque[Dict[str, Any]] = deque(
-            maxlen=self._history_maxlen
+        self._condition_history = self._sensor_history.get(
+            "condition_history", deque(maxlen=192)
         )
 
         # Initialize weather analysis and forecast modules with shared
@@ -320,6 +333,7 @@ class WeatherDetector:
             KEY_FORECAST: forecast_data,
             KEY_LAST_UPDATED: datetime.now().isoformat(),
             KEY_UV_INDEX: sensor_data.get("uv_index"),
+            "ml_active": self._ml_active,
         }
 
         # Add cloud coverage if available from history
@@ -447,8 +461,110 @@ class WeatherDetector:
         # Prepare sensor data in imperial units for analysis
         analysis_data = self._prepare_analysis_sensor_data(sensor_data)
 
+        # Try ML-based condition detection first if model is available and enabled
+        if self._enable_ml and self._ml_model:
+            ml_condition = self._determine_ml_condition(analysis_data)
+            if ml_condition:
+                self._ml_active = True
+                return ml_condition
+
+        self._ml_active = False
         # Use the weather analysis module for condition determination
         return self.analysis.determine_condition(analysis_data, altitude)
+
+    def _get_historical_value_at_delta(
+        self, sensor_key: str, hours_ago: float
+    ) -> Optional[float]:
+        """Get the closest historical value from the history buffer.
+
+        Scans the deque for the reading closest to the target timestamp.
+        """
+        if sensor_key not in self._sensor_history or not self._sensor_history[sensor_key]:
+            return None
+
+        target_time = datetime.now() - timedelta(hours=hours_ago)
+        history = self._sensor_history[sensor_key]
+
+        closest_val = None
+        min_diff = timedelta(hours=1)  # Max 1 hour tolerance for a "match"
+
+        for entry in history:
+            diff = abs(entry["timestamp"] - target_time)
+            if diff < min_diff:
+                min_diff = diff
+                closest_val = entry["value"]
+
+        return closest_val
+
+    def _determine_ml_condition(self, analysis_data: Dict[str, Any]) -> Optional[str]:
+        """Determine weather condition using the Random Forest ML model.
+
+        The model expects 9 features in this specific order:
+        1. Temperature (Raw)
+        2. Humidity (Raw)
+        3. Pressure (Raw)
+        4. Solar Irradiance (Raw)
+        5. Wind Speed (Raw)
+        6. Pressure Trend (1h): NOW - 1h ago
+        7. Pressure Delta (3h): NOW - 3h ago
+        8. Humidity Trend (1h): NOW - 1h ago
+        9. Solar Drop (1h): NOW - 1h ago
+        """
+        try:
+            # 1-5: Current values
+            temp = analysis_data.get(KEY_OUTDOOR_TEMP)
+            hum = analysis_data.get(KEY_HUMIDITY)
+            pres = analysis_data.get(KEY_PRESSURE)
+            solar = analysis_data.get(KEY_SOLAR_RADIATION)
+            wind = analysis_data.get(KEY_WIND_SPEED)
+
+            if any(v is None for v in [temp, hum, pres, solar, wind]):
+                return None
+
+            # 6-9: Trends
+            p_1h = self._get_historical_value_at_delta(KEY_PRESSURE, 1.0)
+            p_3h = self._get_historical_value_at_delta(KEY_PRESSURE, 3.0)
+            h_1h = self._get_historical_value_at_delta(KEY_HUMIDITY, 1.0)
+            s_1h = self._get_historical_value_at_delta(KEY_SOLAR_RADIATION, 1.0)
+
+            # Cold Start check: If we don't have enough history, return None
+            if any(v is None for v in [p_1h, p_3h, h_1h, s_1h]):
+                _LOGGER.debug("ML Inference skipped: Insufficient history for trends")
+                return None
+
+            # Calculate differences
+            press_trend_1h = pres - p_1h
+            press_delta_3h = pres - p_3h
+            hum_trend_1h = hum - h_1h
+            solar_drop_1h = solar - s_1h
+
+            # Prepare feature vector
+            features = [
+                temp,
+                hum,
+                pres,
+                solar,
+                wind,
+                press_trend_1h,
+                press_delta_3h,
+                hum_trend_1h,
+                solar_drop_1h,
+            ]
+
+            # Run prediction
+            # scikit-learn model expects a 2D array: [ [f1, f2, ... f9] ]
+            prediction = self._ml_model.predict([features])
+
+            # Result is usually an array, e.g., ["sunny"]
+            if len(prediction) > 0:
+                result = str(prediction[0])
+                _LOGGER.debug("ML Inference result: %s", result)
+                return result
+
+        except Exception as err:
+            _LOGGER.warning("ML Inference failed: %s", err)
+
+        return None
 
     def _convert_temperature(
         self, temp: Optional[float], unit: Optional[str]

@@ -1,4 +1,4 @@
-# Micro Weather Station for Home Assistant
+# Micro Weather Station for Home Assistant (ML Fork)
 
 [![hacs][hacsbadge]][hacs]
 [![GitHub Release][releases-shield]][releases]
@@ -6,14 +6,18 @@
 [![GitHub Activity][commits-shield]][commits]
 [![License][license-shield]](LICENSE)
 
-A Home Assistant custom integration that creates a smart weather station by analyzing your existing sensor data to determine accurate weather conditions for your specific location and microclimate. Weather station data from external services can be unreliable or not reflect your specific environment - this integration uses your actual sensor readings to provide weather conditions that truly represent what's happening at your location.
+> [!CAUTION]
+> **PERFORMANCE NOTE**: This integration includes Machine Learning capabilities (scikit-learn/Random Forest). Training and running these models is **CPU and RAM intensive**. It is **STRONGLY DISCOURAGED** to run this on low-power devices like Raspberry Pi 3 or 4, as it may lead to system instability or crashes.
+
+A Home Assistant custom integration that creates a smart weather station by analyzing your existing sensor data to determine accurate weather conditions for your specific location and microclimate. This is a **specialized fork** of the original Micro Weather Station, enhanced with local Machine Learning capabilities.
 
 ![Micro Weather Station][logo]
 
 ## Why This Integration?
 
-Weather station data can be unreliable or not reflect your specific microclimate. Here are better ways to detect weather conditions using your actual sensor data:
+Weather station data can be unreliable or not reflect your specific microclimate. This fork offers:
 
+- **🤖 Local Machine Learning**: Train a Random Forest model on your *own* historical data (30 days) to predict local weather onset.
 - **🎯 Microclimate Accuracy**: Your backyard might be sunny while the nearest weather station reports cloudy
 - **🌡️ Local Temperature**: Your sensors know the exact temperature in your garden, not 10 miles away
 - **🌧️ Precipitation Detection**: Know immediately when it starts raining at your location
@@ -27,6 +31,7 @@ This integration analyzes your real sensor data to provide weather conditions th
 
 ## Features
 
+- 🧠 **ML-Powered Detection**: Optional Random Forest model for hyper-local condition prediction.
 - 🌡️ **Smart Weather Detection**: Analyzes real sensor data to determine weather conditions
 - 🧠 **Intelligent Algorithms**: Uses solar radiation, precipitation, wind, and pressure data
 - 📊 **Individual Sensors**: Separate sensor entities for each weather parameter
@@ -44,22 +49,14 @@ This integration analyzes your real sensor data to provide weather conditions th
 
 ### Method 1: HACS (Recommended)
 
-HACS (Home Assistant Community Store) is the easiest way to install and manage custom integrations.
-
-#### Prerequisites
-
-- [HACS](https://hacs.xyz/) must be installed in your Home Assistant instance
-- Home Assistant version 2023.1.0 or higher
-
-#### Installation Steps
-
-1. **Open HACS**: Go to HACS in your Home Assistant sidebar
-2. **Navigate to Integrations**: Click on "Integrations"
-3. **Search and Install**:
-   - Search for "Micro Weather Station" in HACS
-   - Click on it and select "Download"
-   - Choose the latest version
-4. **Restart Home Assistant**: Required for the integration to load
+1. **Open HACS**: Go to HACS in your Home Assistant sidebar.
+2. **Add Custom Repository**: 
+   - Click the three dots in the top right corner.
+   - Select "Custom repositories".
+   - Repository: `https://github.com/AndyTempel/micro-weather-station`
+   - Type: `Integration`
+3. **Search and Install**: Search for "Micro Weather Station" and click "Download".
+4. **Restart Home Assistant**: Required for the integration to load.
 
 ### Method 2: Manual Installation
 
@@ -67,7 +64,7 @@ For advanced users or custom setups.
 
 #### Download Options
 
-- **Latest Release**: Download from [GitHub Releases](https://github.com/caplaz/micro-weather-station/releases)
+- **Latest Release**: Download from [GitHub Releases](https://github.com/AndyTempel/micro-weather-station/releases)
 - **Development Version**: Clone the repository for latest features
 
 #### Installation Steps
@@ -76,11 +73,11 @@ For advanced users or custom setups.
 
    ```bash
    # Option A: Download release
-   wget https://github.com/caplaz/micro-weather-station/archive/refs/tags/v4.1.2.zip
+   wget https://github.com/AndyTempel/micro-weather-station/archive/refs/tags/v4.1.2.zip
    unzip v4.1.2.zip
 
    # Option B: Clone repository
-   git clone https://github.com/caplaz/micro-weather-station.git
+   git clone https://github.com/AndyTempel/micro-weather-station.git
    ```
 
 2. **Copy to Home Assistant**:
@@ -141,7 +138,7 @@ For developers wanting to test or contribute.
 1. **Clone Repository**:
 
    ```bash
-   git clone https://github.com/caplaz/micro-weather-station.git
+   git clone https://github.com/AndyTempel/micro-weather-station.git
    cd micro-weather-station
    ```
 
@@ -176,7 +173,7 @@ For quick testing and development, use the included Docker setup:
 
    ```bash
    # Clone and setup
-   git clone https://github.com/caplaz/micro-weather-station.git
+   git clone https://github.com/AndyTempel/micro-weather-station.git
    cd micro-weather-station
 
    # Start development environment
@@ -349,6 +346,15 @@ automation:
             Temperature: {{ state_attr('weather.micro_weather_station', 'temperature') }}°C
           title: "Weather Update"
 ```
+
+## Machine Learning (ML) Setup
+
+This integration can learn from your local history to improve accuracy.
+
+1. **Enable ML**: Go to the integration Options and check "Enable Machine Learning".
+2. **Collect Data**: You need at least 30 days of historical data for your sensors (Temp, Hum, Pressure, Solar, Wind, Rain).
+3. **Train**: Call the service `micro_weather.train`. This will run in the background thread (Executor).
+4. **Monitor**: Check `binary_sensor.micro_weather_ai_active` to see if the AI is driving your forecast.
 
 ## Entities Created
 
@@ -748,9 +754,9 @@ ha-cli state list | grep temperature
 
 #### Support Channels
 
-- 🐛 [GitHub Issues](https://github.com/caplaz/micro-weather-station/issues) - Bug reports and feature requests
+- 🐛 [GitHub Issues](https://github.com/AndyTempel/micro-weather-station/issues) - Bug reports and feature requests
 - 💬 [Home Assistant Community](https://community.home-assistant.io/) - General questions and discussions
-- 📚 [Documentation](https://github.com/caplaz/micro-weather-station#readme) - Complete setup guide
+- 📚 [Documentation](https://github.com/AndyTempel/micro-weather-station#readme) - Complete setup guide
 
 ## Contributing
 
@@ -766,7 +772,7 @@ Contributions are welcome! Please feel free to submit a Pull Request. For major 
 
 ## Support
 
-- 🐛 [Report Issues](https://github.com/caplaz/micro-weather-station/issues)
+- 🐛 [Report Issues](https://github.com/AndyTempel/micro-weather-station/issues)
 - 💬 [Community Forum](https://community.home-assistant.io/)
 - 📚 [Home Assistant Documentation](https://www.home-assistant.io/docs/)
 
@@ -786,13 +792,13 @@ See [CHANGELOG](CHANGELOG.md) for the complete changelog.
 
 **Note**: This smart weather station uses your existing sensor data to intelligently detect weather conditions. Configure your sensors during setup to get accurate weather detection based on your local environment.
 
-[ci-shield]: https://img.shields.io/github/actions/workflow/status/caplaz/micro-weather-station/ci.yml?style=for-the-badge&label=CI
-[ci]: https://github.com/caplaz/micro-weather-station/actions/workflows/ci.yml
-[commits-shield]: https://img.shields.io/github/commit-activity/y/caplaz/micro-weather-station.svg?style=for-the-badge&v=4.1.2
-[commits]: https://github.com/caplaz/micro-weather-station/commits/main
+[ci-shield]: https://img.shields.io/github/actions/workflow/status/AndyTempel/micro-weather-station/ci.yml?style=for-the-badge&label=CI
+[ci]: https://github.com/AndyTempel/micro-weather-station/actions/workflows/ci.yml
+[commits-shield]: https://img.shields.io/github/commit-activity/y/AndyTempel/micro-weather-station.svg?style=for-the-badge&v=4.1.2
+[commits]: https://github.com/AndyTempel/micro-weather-station/commits/main
 [hacs]: https://github.com/hacs/integration
 [hacsbadge]: https://img.shields.io/badge/HACS-Default-41BDF5.svg?style=for-the-badge
-[license-shield]: https://img.shields.io/github/license/caplaz/micro-weather-station.svg?style=for-the-badge
-[releases-shield]: https://img.shields.io/github/release/caplaz/micro-weather-station.svg?style=for-the-badge&v=4.1.2
-[releases]: https://github.com/caplaz/micro-weather-station/releases
-[logo]: https://raw.githubusercontent.com/caplaz/micro-weather-station/main/images/logo.png
+[license-shield]: https://img.shields.io/github/license/AndyTempel/micro-weather-station.svg?style=for-the-badge
+[releases-shield]: https://img.shields.io/github/release/AndyTempel/micro-weather-station.svg?style=for-the-badge&v=4.1.2
+[releases]: https://github.com/AndyTempel/micro-weather-station/releases
+[logo]: https://raw.githubusercontent.com/AndyTempel/micro-weather-station/main/images/logo.png

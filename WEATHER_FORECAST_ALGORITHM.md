@@ -21,8 +21,9 @@ The main coordination is handled by `weather_forecast.py`, which integrates thes
 
 ### Core Capabilities
 
-1. **Comprehensive Daily Forecast**: 5-day predictions using multi-factor meteorological analysis
-2. **Advanced Hourly Forecast**: 24-hour detailed predictions with astronomical and micro-evolution modeling
+1. **ML-Enhanced Detection**: Condition detection can be powered by a local Random Forest model for hyper-local accuracy.
+2. **Comprehensive Daily Forecast**: 5-day predictions using multi-factor meteorological analysis
+3. **Advanced Hourly Forecast**: 24-hour detailed predictions with astronomical and micro-evolution modeling
 3. **Atmospheric Stability Analysis**: Real-time assessment of air mass stability and weather system dynamics
 4. **Weather System Classification**: Intelligent categorization of current weather patterns and evolution potential
 5. **Historical Pattern Recognition**: Machine learning-like analysis of weather correlations and trends

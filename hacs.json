@@ -1,5 +1,5 @@
 {
-  "name": "Micro Weather Station",
+  "name": "Micro Weather Station (ML Fork)",
   "render_readme": true,
   "filename": "micro_weather.zip",
   "homeassistant": "2023.1.0",

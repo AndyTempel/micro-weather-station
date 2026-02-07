@@ -46,7 +46,7 @@ class SolarAnalyzer:
             zenith_max_radiation: Maximum solar radiation at zenith (W/m²)
         """
         self._sensor_history = sensor_history or {}
-        self._condition_history: deque[Dict[str, Any]] = deque()
+        self._condition_history = self._sensor_history.get("condition_history", deque())
         self.zenith_max_radiation = zenith_max_radiation
 
     def analyze_cloud_cover(
