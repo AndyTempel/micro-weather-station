@@ -356,6 +356,26 @@ This integration can learn from your local history to improve accuracy.
 3. **Train**: Call the service `micro_weather.train`. This will run in the background thread (Executor).
 4. **Monitor**: Check `binary_sensor.micro_weather_ai_active` to see if the AI is driving your forecast.
 
+### Periodic Training (Recommended)
+
+The ML model does not automatically re-train itself. To keep it accurate as seasons change, it is recommended to create an automation that triggers training once a week (e.g., every Sunday at 3 AM).
+
+```yaml
+alias: "Weather Station: Weekly ML Training"
+description: "Re-train the weather model every week to adapt to seasonal changes."
+trigger:
+  - platform: time
+    at: "03:00:00"
+condition:
+  - condition: time
+    weekday:
+      - sun
+action:
+  - service: micro_weather.train
+    data: {}
+mode: single
+```
+
 ## Entities Created
 
 ### Weather Entity

@@ -305,6 +305,43 @@ Enhance weather detection by configuring additional sensors:
    - Active rain sensor should show "rainy"
    - Low solar + high humidity should show "foggy"
 
+## Machine Learning Setup (Optional)
+
+The Micro Weather Station features an optional local Machine Learning engine that can learn from your specific microclimate.
+
+### Enabling ML
+
+1. Go to **Settings** → **Devices & Services**.
+2. Find **Micro Weather Station** and click **Configure**.
+3. Check the **Enable Machine Learning** box and click **Submit**.
+
+### Training the Model
+
+Training is a manual process and requires at least **30 days** of sensor history in your Home Assistant database.
+
+1. Go to **Developer Tools** → **Services**.
+2. Search for `micro_weather.train`.
+3. Click **Call Service**.
+4. Training runs in the background. You can monitor its status via `binary_sensor.micro_weather_ai_active`.
+
+### Automation for Periodic Training
+
+It is recommended to re-train your model weekly to maintain accuracy across changing seasons.
+
+```yaml
+alias: "Weather Station: Weekly ML Training"
+trigger:
+  - platform: time
+    at: "03:00:00"
+condition:
+  - condition: time
+    weekday:
+      - sun
+action:
+  - service: micro_weather.train
+    data: {}
+```
+
 ## Dashboard Integration
 
 ### Step 1: Add Weather Card
