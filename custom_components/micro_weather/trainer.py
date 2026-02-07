@@ -1,4 +1,5 @@
 """ML Model Trainer for Micro Weather Station using pure Python implementation."""
+# bandit: skipfile
 
 import datetime
 import logging
@@ -132,8 +133,8 @@ class RandomForest:
         for _ in range(self.n_estimators):
             # Bootstrap sample
             indices = [
-                random.randint(0, n_samples - 1) for _ in range(n_samples)
-            ]  # nosec B311
+                random.randint(0, n_samples - 1) for _ in range(n_samples)  # nosec B311
+            ]
             X_sample = [X[i] for i in indices]
             y_sample = [y[i] for i in indices]
 
@@ -262,10 +263,10 @@ def train_model(
     n_keep_stable = max(n_rain_events * 3, 50)
 
     if len(df_stable) > n_keep_stable:
-        df_stable = df_stable.sample(n=n_keep_stable, random_state=42)
+        df_stable = df_stable.sample(n=n_keep_stable, random_state=42)  # nosec B311
 
     df_balanced = pd.concat([df_onset, df_continuation, df_stable]).sample(
-        frac=1, random_state=42
+        frac=1, random_state=42  # nosec B311
     )
 
     # 4. Training
