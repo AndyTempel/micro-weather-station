@@ -534,15 +534,13 @@ class WeatherDetector:
 
             # Calculate differences
             # mypy: we already checked for None above
-            assert pres is not None
-            assert solar is not None
-            assert hum is not None
+            if pres is None or solar is None or hum is None:
+                return None
 
             press_trend_1h = pres - cast(float, p_1h)
             press_delta_3h = pres - cast(float, p_3h)
             hum_trend_1h = hum - cast(float, h_1h)
             solar_drop_1h = solar - cast(float, s_1h)
-
             # Prepare feature vector
             features = [
                 temp,

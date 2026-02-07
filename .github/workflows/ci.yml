@@ -100,6 +100,7 @@ jobs:
           # Set up Python environment
           python -m pip install --upgrade pip
           pip install homeassistant==2025.1.4
+          pip install -r requirements-dev.txt
 
           # Test that the component can be imported
           export PYTHONPATH="${PWD}:${PYTHONPATH}"
