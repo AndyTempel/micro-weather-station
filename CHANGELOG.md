@@ -1,5 +1,29 @@
 # Changelog
 
+## 4.1.3 (2026-02-07)
+
+### Major Features
+
+- **Local Machine Learning Capabilities**: Integrated a self-hosted Random Forest model for high-precision weather prediction.
+  - Automatically trains on 30 days of historical sensor data from the Home Assistant `recorder`.
+  - Implements intelligent dataset balancing to improve accuracy for rare weather events like rain onset.
+  - Seamless fallback to the classic Zambretti algorithm if the model is untrained or disabled.
+  - Dedicated `AI Active` binary sensor to monitor model status and accuracy.
+  - New `micro_weather.train` service to manually trigger model re-training.
+
+### Technical Improvements
+
+- **Enhanced Code Quality & Security**:
+  - Achieved 88% overall test coverage with comprehensive new tests for ML modules and sensors.
+  - Replaced assertions with robust error handling to satisfy security scans (Bandit).
+  - Full type-safety with `mypy` and linting compliance with `ruff`.
+  - Automated CI improvements for better dependency management and validation.
+
+### Bug Fixes
+
+- **Configuration Flow Reliability**: Fixed several issues in the multi-step configuration flow, ensuring stable sensor mapping and option updates.
+- **Dependency Management**: Resolved missing module errors in CI by properly documenting all ML-related requirements.
+
 ## 4.1.2 (2026-01-30)
 
 ### Bug Fixes
