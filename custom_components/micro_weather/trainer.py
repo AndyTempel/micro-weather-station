@@ -168,8 +168,6 @@ async def train_model(
     """
     from homeassistant.components.recorder import history
     from homeassistant.helpers.recorder import get_instance
-    import joblib
-    import pandas as pd
 
     _LOGGER.info("Starting Pure-Python ML model training for Micro Weather Station")
 
@@ -197,17 +195,26 @@ async def train_model(
         key_to_entity[key] = entity_id
 
     # Use the recorder's executor for database access as recommended by HA
+    # Correct positional arguments to avoid NotImplementedError (filters)
+    # 1: hass, 2: start, 3: end, 4: entity_ids, 5: filters (None),
+    # 6: include_start_time_state (True), 7: significant_changes_only (False)
     hist_data = await get_instance(hass).async_add_executor_job(
         history.get_significant_states,
         hass,
         start_time,
         end_time,
         entity_ids,
-        False,  # significant_changes_only
+        None,
+        True,
+        False,
     )
 
     def process_data():
         """Process data and train model in executor."""
+        # Move heavy imports here to avoid blocking the event loop
+        import joblib
+        import pandas as pd
+
         dfs = []
         for key, entity_id in key_to_entity.items():
             states = hist_data.get(entity_id)
@@ -298,7 +305,7 @@ async def train_model(
             clf = RandomForest(n_estimators=10, max_depth=8)
             clf.fit(X, y)
 
-            # Save model using joblib (as requested, it handles custom objects well)
+            # Save model using joblib (it handles custom objects well)
             joblib.dump(clf, model_path)
 
             accuracy = clf.score(X, y)
