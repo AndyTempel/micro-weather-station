@@ -166,7 +166,8 @@ async def train_model(
 
     This function runs in the event loop but offloads DB and CPU work.
     """
-    from homeassistant.components.recorder import get_instance, history
+    from homeassistant.components.recorder import history
+    from homeassistant.helpers.recorder import get_instance
     import joblib
     import pandas as pd
 

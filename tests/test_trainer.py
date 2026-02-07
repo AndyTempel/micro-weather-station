@@ -66,7 +66,7 @@ async def test_train_model_success(
     
     with (
         patch(
-            "homeassistant.components.recorder.get_instance",
+            "homeassistant.helpers.recorder.get_instance",
             return_value=mock_recorder,
         ),
         patch(
@@ -97,7 +97,7 @@ async def test_train_model_insufficient_data(hass: HomeAssistant, sensor_map):
 
     with (
         patch(
-            "homeassistant.components.recorder.get_instance",
+            "homeassistant.helpers.recorder.get_instance",
             return_value=mock_recorder,
         ),
         patch(
@@ -119,7 +119,7 @@ async def test_train_model_exception(
 
     with (
         patch(
-            "homeassistant.components.recorder.get_instance",
+            "homeassistant.helpers.recorder.get_instance",
             return_value=mock_recorder,
         ),
         patch(
