@@ -131,7 +131,7 @@ class RandomForest:
 
         for _ in range(self.n_estimators):
             # Bootstrap sample
-            indices = [random.randint(0, n_samples - 1) for _ in range(n_samples)]
+            indices = [random.randint(0, n_samples - 1) for _ in range(n_samples)]  # nosec B311
             X_sample = [X[i] for i in indices]
             y_sample = [y[i] for i in indices]
 

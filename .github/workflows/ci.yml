@@ -32,7 +32,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential python3-dev
           # Install from requirements file using uv
-          uv pip install --prefer-binary -r requirements-dev.txt
+          uv pip install -r requirements-dev.txt
 
       - name: Check code formatting with Black
         run: black --check --diff custom_components/
