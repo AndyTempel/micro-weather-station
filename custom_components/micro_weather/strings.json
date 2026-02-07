@@ -19,7 +19,8 @@
           "solar_lux_sensor": "Solar Lux Sensor",
           "uv_index_sensor": "UV Index Sensor",
           "sun_sensor": "Sun Sensor",
-          "update_interval": "Update Interval (minutes)"
+          "update_interval": "Update Interval (minutes)",
+          "enable_ml": "Enable Machine Learning"
         },
         "data_description": {
           "outdoor_temp_sensor": "Required sensor for basic weather detection. Provides temperature readings used in all weather calculations and condition detection.",
@@ -143,7 +144,8 @@
           "uv_index_sensor": "UV Index Sensor",
           "sun_sensor": "Sun Sensor",
           "altitude": "Station Altitude",
-          "update_interval": "Update Interval (minutes)"
+          "update_interval": "Update Interval (minutes)",
+          "enable_ml": "Enable Machine Learning"
         },
         "data_description": {
           "outdoor_temp_sensor": "Required sensor for basic weather detection. Provides temperature readings used in all weather calculations and condition detection.",

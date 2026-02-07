@@ -89,12 +89,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
         from .trainer import train_model
 
-        # Execute training in executor thread
+        # Execute training (handles its own executor offloading)
         # Cast options to dict[str, str] as trainer expects it
         sensor_map = cast(dict[str, str], dict(entry.options))
-        result = await hass.async_add_executor_job(
-            train_model, hass, sensor_map, model_path
-        )
+        result = await train_model(hass, sensor_map, model_path)
 
         if result.get("success"):
             _LOGGER.info("ML Model training completed successfully")

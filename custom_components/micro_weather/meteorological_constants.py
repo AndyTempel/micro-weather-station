@@ -695,7 +695,6 @@ class StabilityConstants:
     AIR_MASS_MIN_STABILITY: float = 0.6  # Minimum stability for air mass change
 
 
-@dataclass(frozen=True)
 class PressureTrendConstants:
     """Pressure trend classification and severity thresholds.
 
@@ -815,27 +814,24 @@ class SolarPhysicsConstants:
     PRESSURE_LONG_TERM_WEIGHT: float = 0.4
 
 
-@dataclass(frozen=True)
 class TrendConstants:
     """Constants for trend analysis and seasonal factors."""
 
     # Seasonal factors (0-1 scale, higher = more variable)
-    SEASONAL_FACTORS: Dict[int, float] = field(
-        default_factory=lambda: {
-            12: 0.8,
-            1: 0.9,
-            2: 0.7,  # Winter
-            3: 0.6,
-            4: 0.5,
-            5: 0.4,  # Spring
-            6: 0.3,
-            7: 0.4,
-            8: 0.5,  # Summer
-            9: 0.6,
-            10: 0.7,
-            11: 0.8,  # Fall
-        }
-    )
+    SEASONAL_FACTORS: Dict[int, float] = {
+        12: 0.8,
+        1: 0.9,
+        2: 0.7,  # Winter
+        3: 0.6,
+        4: 0.5,
+        5: 0.4,  # Spring
+        6: 0.3,
+        7: 0.4,
+        8: 0.5,  # Summer
+        9: 0.6,
+        10: 0.7,
+        11: 0.8,  # Fall
+    }
 
     # Volatility thresholds
     VOLATILITY_ACTIVE: float = 1.0  # Threshold for active weather

@@ -1,10 +1,8 @@
-"""ML Model Trainer for Micro Weather Station using pure Python implementation."""
-
 # bandit: skipfile
+"""ML Model Trainer for Micro Weather Station using pure Python implementation."""
 
 import datetime
 import logging
-import math
 import random
 from typing import Any, Dict, List, Optional, Tuple, cast
 
@@ -161,14 +159,14 @@ class RandomForest:
         return correct / len(y)
 
 
-def train_model(
+async def train_model(
     hass: HomeAssistant, sensor_map: Dict[str, str], model_path: str
 ) -> Dict[str, Any]:
     """Train the weather model using historical data.
 
-    This function runs in the executor thread.
+    This function runs in the event loop but offloads DB and CPU work.
     """
-    from homeassistant.components.recorder import history
+    from homeassistant.components.recorder import get_instance, history
     import joblib
     import pandas as pd
 
@@ -197,116 +195,125 @@ def train_model(
         entity_ids.append(entity_id)
         key_to_entity[key] = entity_id
 
-    hist_data = history.get_significant_states(
+    # Use the recorder's executor for database access as recommended by HA
+    hist_data = await get_instance(hass).async_add_executor_job(
+        history.get_significant_states,
         hass,
         start_time,
         end_time,
-        entity_ids=entity_ids,
-        significant_changes_only=False,
+        entity_ids,
+        False,  # significant_changes_only
     )
 
-    dfs = []
-    for key, entity_id in key_to_entity.items():
-        states = hist_data.get(entity_id)
-        if not states:
-            _LOGGER.warning("No history found for %s", entity_id)
-            continue
-
-        data = []
-        for state in states:
-            if not isinstance(state, State):
-                continue
-            try:
-                val = float(state.state)
-                data.append({"timestamp": state.last_updated, key: val})
-            except (ValueError, TypeError):
+    def process_data():
+        """Process data and train model in executor."""
+        dfs = []
+        for key, entity_id in key_to_entity.items():
+            states = hist_data.get(entity_id)
+            if not states:
+                _LOGGER.warning("No history found for %s", entity_id)
                 continue
 
-        if data:
-            df_s = pd.DataFrame(data)
-            df_s["timestamp"] = pd.to_datetime(df_s["timestamp"], utc=True)
-            df_s.set_index("timestamp", inplace=True)
-            df_s = df_s.resample("15min").mean()
-            dfs.append(df_s)
+            data = []
+            for state in states:
+                if not isinstance(state, State):
+                    continue
+                try:
+                    val = float(state.state)
+                    data.append({"timestamp": state.last_updated, key: val})
+                except (ValueError, TypeError):
+                    continue
 
-    if len(dfs) < len(required_keys):
-        return {"success": False, "error": "Insufficient data sources"}
+            if data:
+                df_s = pd.DataFrame(data)
+                df_s["timestamp"] = pd.to_datetime(df_s["timestamp"], utc=True)
+                df_s.set_index("timestamp", inplace=True)
+                df_s = df_s.resample("15min").mean()
+                dfs.append(df_s)
 
-    # 2. Merge & Feature Engineering
-    df = pd.concat(dfs, axis=1)
-    df = df.interpolate(method="time", limit=2).dropna()
+        if len(dfs) < len(required_keys):
+            return {"success": False, "error": "Insufficient data sources"}
 
-    if df.empty:
-        return {"success": False, "error": "No overlapping data"}
+        # 2. Merge & Feature Engineering
+        df = pd.concat(dfs, axis=1)
+        df = df.interpolate(method="time", limit=2).dropna()
 
-    # Trends
-    df["pressure_trend_1h"] = df[CONF_PRESSURE_SENSOR].diff(4)
-    df["pressure_delta_3h"] = df[CONF_PRESSURE_SENSOR].diff(12)
-    df["humidity_trend_1h"] = df[CONF_HUMIDITY_SENSOR].diff(4)
-    df["solar_drop_1h"] = df[CONF_SOLAR_RADIATION_SENSOR].diff(4)
+        if df.empty:
+            return {"success": False, "error": "No overlapping data"}
 
-    # Target: Will it rain in the next 45 minutes?
-    df["target"] = (df[CONF_RAIN_RATE_SENSOR].shift(-3) > 0).astype(int)
-    df = df.dropna()
+        # Trends
+        df["pressure_trend_1h"] = df[CONF_PRESSURE_SENSOR].diff(4)
+        df["pressure_delta_3h"] = df[CONF_PRESSURE_SENSOR].diff(12)
+        df["humidity_trend_1h"] = df[CONF_HUMIDITY_SENSOR].diff(4)
+        df["solar_drop_1h"] = df[CONF_SOLAR_RADIATION_SENSOR].diff(4)
 
-    if df.empty:
-        return {"success": False, "error": "Insufficient data points"}
+        # Target: Will it rain in the next 45 minutes?
+        df["target"] = (df[CONF_RAIN_RATE_SENSOR].shift(-3) > 0).astype(int)
+        df = df.dropna()
 
-    # 3. Data Balancing
-    mask_raining_now = df[CONF_RAIN_RATE_SENSOR] > 0
-    mask_will_rain = df["target"] == 1
+        if df.empty:
+            return {"success": False, "error": "Insufficient data points"}
 
-    df_continuation = df[mask_raining_now]
-    df_onset = df[~mask_raining_now & mask_will_rain]
-    df_stable = df[~mask_raining_now & ~mask_will_rain]
+        # 3. Data Balancing
+        mask_raining_now = df[CONF_RAIN_RATE_SENSOR] > 0
+        mask_will_rain = df["target"] == 1
 
-    n_rain_events = len(df_onset) + len(df_continuation)
-    n_keep_stable = max(n_rain_events * 3, 50)
+        df_continuation = df[mask_raining_now]
+        df_onset = df[~mask_raining_now & mask_will_rain]
+        df_stable = df[~mask_raining_now & ~mask_will_rain]
 
-    if len(df_stable) > n_keep_stable:
-        df_stable = df_stable.sample(n=n_keep_stable, random_state=42)  # nosec B311
+        n_rain_events = len(df_onset) + len(df_continuation)
+        n_keep_stable = max(n_rain_events * 3, 50)
 
-    df_balanced = pd.concat([df_onset, df_continuation, df_stable]).sample(
-        frac=1, random_state=42  # nosec B311
-    )
+        df_stable_balanced = df_stable
+        if len(df_stable) > n_keep_stable:
+            df_stable_balanced = df_stable.sample(n=n_keep_stable, random_state=42)
 
-    # 4. Training
-    feature_cols = [
-        CONF_OUTDOOR_TEMP_SENSOR,
-        CONF_HUMIDITY_SENSOR,
-        CONF_PRESSURE_SENSOR,
-        CONF_SOLAR_RADIATION_SENSOR,
-        CONF_WIND_SPEED_SENSOR,
-        "pressure_trend_1h",
-        "pressure_delta_3h",
-        "humidity_trend_1h",
-        "solar_drop_1h",
-    ]
+        df_balanced = pd.concat([df_onset, df_continuation, df_stable_balanced]).sample(
+            frac=1, random_state=42
+        )
 
-    X = df_balanced[feature_cols].values.tolist()
-    y = df_balanced["target"].values.tolist()
+        # 4. Training
+        feature_cols = [
+            CONF_OUTDOOR_TEMP_SENSOR,
+            CONF_HUMIDITY_SENSOR,
+            CONF_PRESSURE_SENSOR,
+            CONF_SOLAR_RADIATION_SENSOR,
+            CONF_WIND_SPEED_SENSOR,
+            "pressure_trend_1h",
+            "pressure_delta_3h",
+            "humidity_trend_1h",
+            "solar_drop_1h",
+        ]
 
-    if len(X) < 20:
-        return {"success": False, "error": "Insufficient samples"}
+        X = df_balanced[feature_cols].values.tolist()
+        y = df_balanced["target"].values.tolist()
 
-    try:
-        # Use smaller forest for performance in pure Python
-        clf = RandomForest(n_estimators=10, max_depth=8)
-        clf.fit(X, y)
+        if len(X) < 20:
+            return {"success": False, "error": "Insufficient samples"}
 
-        # Save model using joblib (as requested, it handles custom objects well)
-        joblib.dump(clf, model_path)
+        try:
+            # Use smaller forest for performance in pure Python
+            clf = RandomForest(n_estimators=10, max_depth=8)
+            clf.fit(X, y)
 
-        accuracy = clf.score(X, y)
+            # Save model using joblib (as requested, it handles custom objects well)
+            joblib.dump(clf, model_path)
 
-        _LOGGER.info("Pure-Python model training successful. Accuracy: %.2f", accuracy)
+            accuracy = clf.score(X, y)
 
-        return {
-            "success": True,
-            "accuracy": accuracy,
-            "last_trained": datetime.datetime.now().isoformat(),
-        }
+            _LOGGER.info(
+                "Pure-Python model training successful. Accuracy: %.2f", accuracy
+            )
 
-    except Exception as err:
-        _LOGGER.exception("Training failed: %s", err)
-        return {"success": False, "error": str(err)}
+            return {
+                "success": True,
+                "accuracy": accuracy,
+                "last_trained": datetime.datetime.now().isoformat(),
+            }
+
+        except Exception as err:
+            _LOGGER.exception("Training failed: %s", err)
+            return {"success": False, "error": str(err)}
+
+    return await hass.async_add_executor_job(process_data)

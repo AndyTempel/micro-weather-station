@@ -1,7 +1,7 @@
 """Tests for Micro Weather Station ML trainer."""
 
 import datetime
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, AsyncMock
 
 from homeassistant.core import HomeAssistant, State
 import pytest
@@ -61,16 +61,21 @@ async def test_train_model_success(
     hass: HomeAssistant, sensor_map, mock_history_states
 ):
     """Test successful model training."""
+    mock_recorder = MagicMock()
+    mock_recorder.async_add_executor_job = AsyncMock(side_effect=lambda f, *args: f(*args))
+    
     with (
+        patch(
+            "homeassistant.components.recorder.get_instance",
+            return_value=mock_recorder,
+        ),
         patch(
             "homeassistant.components.recorder.history.get_significant_states",
             return_value=mock_history_states,
         ),
         patch("joblib.dump") as mock_dump,
     ):
-        result = await hass.async_add_executor_job(
-            train_model, hass, sensor_map, "mock_path.joblib"
-        )
+        result = await train_model(hass, sensor_map, "mock_path.joblib")
 
         assert result["success"] is True
         assert isinstance(result["accuracy"], float)
@@ -80,22 +85,27 @@ async def test_train_model_success(
 
 async def test_train_model_missing_sensor(hass: HomeAssistant):
     """Test training failure when sensor is missing from map."""
-    result = await hass.async_add_executor_job(
-        train_model, hass, {}, "mock_path.joblib"
-    )
+    result = await train_model(hass, {}, "mock_path.joblib")
     assert result["success"] is False
     assert "Missing" in result["error"]
 
 
 async def test_train_model_insufficient_data(hass: HomeAssistant, sensor_map):
     """Test training failure with insufficient data."""
-    with patch(
-        "homeassistant.components.recorder.history.get_significant_states",
-        return_value={},
+    mock_recorder = MagicMock()
+    mock_recorder.async_add_executor_job = AsyncMock(side_effect=lambda f, *args: f(*args))
+
+    with (
+        patch(
+            "homeassistant.components.recorder.get_instance",
+            return_value=mock_recorder,
+        ),
+        patch(
+            "homeassistant.components.recorder.history.get_significant_states",
+            return_value={},
+        ),
     ):
-        result = await hass.async_add_executor_job(
-            train_model, hass, sensor_map, "mock_path.joblib"
-        )
+        result = await train_model(hass, sensor_map, "mock_path.joblib")
         assert result["success"] is False
         assert "Insufficient data sources" in result["error"]
 
@@ -104,7 +114,14 @@ async def test_train_model_exception(
     hass: HomeAssistant, sensor_map, mock_history_states
 ):
     """Test training failure on exception."""
+    mock_recorder = MagicMock()
+    mock_recorder.async_add_executor_job = AsyncMock(side_effect=lambda f, *args: f(*args))
+
     with (
+        patch(
+            "homeassistant.components.recorder.get_instance",
+            return_value=mock_recorder,
+        ),
         patch(
             "homeassistant.components.recorder.history.get_significant_states",
             return_value=mock_history_states,
@@ -114,8 +131,6 @@ async def test_train_model_exception(
             side_effect=Exception("Training error"),
         ),
     ):
-        result = await hass.async_add_executor_job(
-            train_model, hass, sensor_map, "mock_path.joblib"
-        )
+        result = await train_model(hass, sensor_map, "mock_path.joblib")
         assert result["success"] is False
         assert "Training error" in result["error"]
