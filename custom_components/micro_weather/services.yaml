@@ -1,0 +1,3 @@
+train:
+  name: Train ML Model
+  description: Trains the local Machine Learning model using historical sensor data.
