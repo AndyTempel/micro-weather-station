@@ -21,14 +21,18 @@ jobs:
         with:
           python-version: "3.13"
 
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
           # Install build dependencies
           sudo apt-get update
           sudo apt-get install -y build-essential python3-dev
-          # Install from requirements file with binary preference
-          pip install --prefer-binary -r requirements-dev.txt
+          # Install from requirements file using uv
+          uv pip install --prefer-binary -r requirements-dev.txt
 
       - name: Check code formatting with Black
         run: black --check --diff custom_components/
@@ -97,10 +101,13 @@ jobs:
 
       - name: Test Component Import
         run: |
+          # Set up uv
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          source $HOME/.cargo/env
+          
           # Set up Python environment
-          python -m pip install --upgrade pip
-          pip install homeassistant==2025.1.4
-          pip install -r requirements-dev.txt
+          uv pip install homeassistant==2025.1.4
+          uv pip install -r requirements-dev.txt
 
           # Test that the component can be imported
           export PYTHONPATH="${PWD}:${PYTHONPATH}"
@@ -142,15 +149,19 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
       - name: Install Home Assistant ${{ matrix.home-assistant-version }}
         run: |
-          python -m pip install --upgrade pip
           # Install build dependencies for C extensions
           sudo apt-get update
           sudo apt-get install -y build-essential python3-dev libffi-dev libssl-dev
-          # Use --only-binary to prefer pre-built wheels and avoid compilation issues
-          pip install --only-binary=aiohttp,yarl,multidict homeassistant==${{ matrix.home-assistant-version }}
-          pip install -r requirements-dev.txt
+          # Use uv to install dependencies
+          uv pip install homeassistant==${{ matrix.home-assistant-version }}
+          uv pip install -r requirements-dev.txt
 
       - name: Run tests
         run: |

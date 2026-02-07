@@ -1,8 +1,10 @@
-"""ML Model Trainer for Micro Weather Station."""
+"""ML Model Trainer for Micro Weather Station using pure Python implementation."""
 
 import datetime
 import logging
-from typing import Any, Dict
+import math
+import random
+from typing import Any, Dict, List, Optional, Tuple, cast
 
 from homeassistant.core import HomeAssistant, State
 from homeassistant.util import dt as dt_util
@@ -19,6 +21,142 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 
+class DecisionTree:
+    """A pure Python Decision Tree Classifier using Gini Impurity."""
+
+    def __init__(self, max_depth: int = 10, min_samples_split: int = 2):
+        self.max_depth = max_depth
+        self.min_samples_split = min_samples_split
+        self.tree = None
+
+    def fit(self, X: List[List[float]], y: List[int]):
+        """Build the decision tree."""
+        self.tree = self._build_tree(X, y, depth=0)
+
+    def _gini(self, y: List[int]) -> float:
+        """Calculate Gini Impurity."""
+        m = len(y)
+        if m == 0:
+            return 0
+        p_1 = sum(y) / m
+        return 1.0 - p_1**2 - (1.0 - p_1) ** 2
+
+    def _best_split(
+        self, X: List[List[float]], y: List[int]
+    ) -> Tuple[Optional[int], Optional[float]]:
+        """Find the best feature and threshold to split on."""
+        best_gini = 1.0
+        best_idx, best_thr = None, None
+        n_features = len(X[0])
+
+        for idx in range(n_features):
+            # Sort feature values to find best split points
+            feature_values = sorted(set(row[idx] for row in X))
+            for i in range(len(feature_values) - 1):
+                threshold = (feature_values[i] + feature_values[i + 1]) / 2
+
+                y_left = [y[j] for j, row in enumerate(X) if row[idx] <= threshold]
+                y_right = [y[j] for j, row in enumerate(X) if row[idx] > threshold]
+
+                if not y_left or not y_right:
+                    continue
+
+                gini = (
+                    len(y_left) * self._gini(y_left)
+                    + len(y_right) * self._gini(y_right)
+                ) / len(y)
+
+                if gini < best_gini:
+                    best_gini = gini
+                    best_idx = idx
+                    best_thr = threshold
+
+        return best_idx, best_thr
+
+    def _build_tree(self, X: List[List[float]], y: List[int], depth: int) -> Any:
+        """Recursive function to build the tree structure."""
+        num_samples = len(y)
+        num_class_1 = sum(y)
+
+        # Base cases: pure node, max depth, or too few samples
+        if num_class_1 == 0:
+            return 0
+        if num_class_1 == num_samples:
+            return 1
+        if depth >= self.max_depth or num_samples < self.min_samples_split:
+            return 1 if num_class_1 / num_samples >= 0.5 else 0
+
+        idx, thr = self._best_split(X, y)
+        if idx is None or thr is None:
+            return 1 if num_class_1 / num_samples >= 0.5 else 0
+
+        indices_left = [i for i, row in enumerate(X) if row[idx] <= thr]
+        indices_right = [i for i, row in enumerate(X) if row[idx] > thr]
+
+        left = self._build_tree(
+            [X[i] for i in indices_left], [y[i] for i in indices_left], depth + 1
+        )
+        right = self._build_tree(
+            [X[i] for i in indices_right], [y[i] for i in indices_right], depth + 1
+        )
+
+        return (idx, thr, left, right)
+
+    def predict_row(self, row: List[float]) -> int:
+        """Predict class for a single row."""
+        node = self.tree
+        if node is None:
+            return 0
+        while isinstance(node, tuple):
+            idx, thr, left, right = node
+            node = left if row[idx] <= thr else right
+        return cast(int, node)
+
+
+class RandomForest:
+    """A pure Python Random Forest Classifier."""
+
+    def __init__(
+        self, n_estimators: int = 10, max_depth: int = 10, min_samples_split: int = 5
+    ):
+        self.n_estimators = n_estimators
+        self.max_depth = max_depth
+        self.min_samples_split = min_samples_split
+        self.trees: List[DecisionTree] = []
+
+    def fit(self, X: List[List[float]], y: List[int]):
+        """Train the forest using bootstrap samples."""
+        self.trees = []
+        n_samples = len(X)
+
+        for _ in range(self.n_estimators):
+            # Bootstrap sample
+            indices = [random.randint(0, n_samples - 1) for _ in range(n_samples)]
+            X_sample = [X[i] for i in indices]
+            y_sample = [y[i] for i in indices]
+
+            tree = DecisionTree(
+                max_depth=self.max_depth, min_samples_split=self.min_samples_split
+            )
+            tree.fit(X_sample, y_sample)
+            self.trees.append(tree)
+
+    def predict(self, X: List[List[float]]) -> List[int]:
+        """Predict by averaging tree outputs."""
+        predictions = []
+        for row in X:
+            votes = [tree.predict_row(row) for tree in self.trees]
+            # Majority vote
+            predictions.append(1 if sum(votes) / len(votes) >= 0.5 else 0)
+        return predictions
+
+    def score(self, X: List[List[float]], y: List[int]) -> float:
+        """Calculate accuracy."""
+        preds = self.predict(X)
+        correct = sum(1 for p, gt in zip(preds, y) if p == gt)
+        return correct / len(y)
+
+
 def train_model(
     hass: HomeAssistant, sensor_map: Dict[str, str], model_path: str
 ) -> Dict[str, Any]:
@@ -29,17 +167,12 @@ def train_model(
     from homeassistant.components.recorder import history
     import joblib
     import pandas as pd
-    from sklearn.ensemble import RandomForestClassifier
 
-    _LOGGER.info("Starting ML model training for Micro Weather Station")
+    _LOGGER.info("Starting Pure-Python ML model training for Micro Weather Station")
 
     # 1. Gather historical data
     end_time = dt_util.utcnow()
     start_time = end_time - datetime.timedelta(days=30)
-
-    # We need specific sensors for the 9 features requested:
-    # 1. Temp, 2. Humidity, 3. Pressure, 4. Solar, 5. Wind
-    # And we need Rain for the target.
 
     required_keys = [
         CONF_OUTDOOR_TEMP_SENSOR,
@@ -60,9 +193,6 @@ def train_model(
         entity_ids.append(entity_id)
         key_to_entity[key] = entity_id
 
-    _LOGGER.debug("Fetching history for entities: %s", entity_ids)
-
-    # get_significant_states returns a dict {entity_id: [states]}
     hist_data = history.get_significant_states(
         hass,
         start_time,
@@ -92,60 +222,39 @@ def train_model(
             df_s = pd.DataFrame(data)
             df_s["timestamp"] = pd.to_datetime(df_s["timestamp"], utc=True)
             df_s.set_index("timestamp", inplace=True)
-            # Resample to 15min intervals to align data
             df_s = df_s.resample("15min").mean()
             dfs.append(df_s)
 
     if len(dfs) < len(required_keys):
-        _LOGGER.error(
-            "Insufficient data sources for training. Found %d/%d",
-            len(dfs),
-            len(required_keys),
-        )
         return {"success": False, "error": "Insufficient data sources"}
 
     # 2. Merge & Feature Engineering
     df = pd.concat(dfs, axis=1)
-    # Interpolate missing values (up to 30 mins)
     df = df.interpolate(method="time", limit=2).dropna()
 
     if df.empty:
-        _LOGGER.error("No overlapping data found for sensors")
         return {"success": False, "error": "No overlapping data"}
 
-    # Feature Engineering (Matching the 9 features requested)
-    # Order: Temp, Hum, Pres, Solar, Wind, PresTrend1h, PresDelta3h, HumTrend1h, SolarDrop1h
-
-    # Trends (resampled to 15min, so 1h = 4 steps, 3h = 12 steps)
+    # Trends
     df["pressure_trend_1h"] = df[CONF_PRESSURE_SENSOR].diff(4)
     df["pressure_delta_3h"] = df[CONF_PRESSURE_SENSOR].diff(12)
     df["humidity_trend_1h"] = df[CONF_HUMIDITY_SENSOR].diff(4)
     df["solar_drop_1h"] = df[CONF_SOLAR_RADIATION_SENSOR].diff(4)
 
-    # Target: Will it rain in the next 45 minutes? (3 * 15min steps)
+    # Target: Will it rain in the next 45 minutes?
     df["target"] = (df[CONF_RAIN_RATE_SENSOR].shift(-3) > 0).astype(int)
-
     df = df.dropna()
 
     if df.empty:
-        _LOGGER.error("Not enough data points after feature engineering")
         return {"success": False, "error": "Insufficient data points"}
 
     # 3. Data Balancing
-    # Logic from WeatherModel.py: Undersample stable weather
     mask_raining_now = df[CONF_RAIN_RATE_SENSOR] > 0
     mask_will_rain = df["target"] == 1
 
     df_continuation = df[mask_raining_now]
     df_onset = df[~mask_raining_now & mask_will_rain]
     df_stable = df[~mask_raining_now & ~mask_will_rain]
-
-    _LOGGER.info(
-        "Distribution -> Stable: %d, Continuation: %d, Onset: %d",
-        len(df_stable),
-        len(df_continuation),
-        len(df_onset),
-    )
 
     n_rain_events = len(df_onset) + len(df_continuation)
     n_keep_stable = max(n_rain_events * 3, 50)
@@ -170,36 +279,28 @@ def train_model(
         "solar_drop_1h",
     ]
 
-    X = df_balanced[feature_cols]
-    y = df_balanced["target"]
+    X = df_balanced[feature_cols].values.tolist()
+    y = df_balanced["target"].values.tolist()
 
     if len(X) < 20:
-        _LOGGER.error("Too few samples for training: %d", len(X))
         return {"success": False, "error": "Insufficient samples"}
 
     try:
-        clf = RandomForestClassifier(
-            n_estimators=100, max_depth=10, min_samples_leaf=4, n_jobs=1
-        )
+        # Use smaller forest for performance in pure Python
+        clf = RandomForest(n_estimators=10, max_depth=8)
         clf.fit(X, y)
 
-        # Save model
+        # Save model using joblib (as requested, it handles custom objects well)
         joblib.dump(clf, model_path)
 
         accuracy = clf.score(X, y)
-        importances = {
-            feature: float(importance)
-            for feature, importance in zip(feature_cols, clf.feature_importances_)
-        }
 
-        _LOGGER.info("Model training successful. Accuracy: %.2f", accuracy)
-        _LOGGER.debug("Feature importances: %s", importances)
+        _LOGGER.info("Pure-Python model training successful. Accuracy: %.2f", accuracy)
 
         return {
             "success": True,
             "accuracy": accuracy,
             "last_trained": datetime.datetime.now().isoformat(),
-            "feature_importances": importances,
         }
 
     except Exception as err:

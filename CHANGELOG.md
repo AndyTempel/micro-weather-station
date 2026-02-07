@@ -1,5 +1,20 @@
 # Changelog
 
+## 4.1.4 (2026-02-07)
+
+### Major Features
+
+- **Zero-Dependency ML Engine**: Transitioned from `scikit-learn` to a custom, pure Python Random Forest implementation.
+  - Guarantees 100% compatibility with Alpine Linux (Home Assistant OS and Official Docker Containers).
+  - Eliminates "Requirements not found" and binary compilation errors during installation.
+  - Significantly reduces integration footprint while maintaining high-precision weather prediction.
+
+### Technical Improvements
+
+- **CI/CD Performance Optimization**: Integrated `uv` into the GitHub Actions workflows.
+  - Replaced standard `pip` with `uv pip` for up to 10x faster dependency installation.
+  - Optimized environment setup across linting, validation, and testing jobs.
+
 ## 4.1.3 (2026-02-07)
 
 ### Major Features

@@ -555,13 +555,16 @@ class WeatherDetector:
             ]
 
             # Run prediction
-            # scikit-learn model expects a 2D array: [ [f1, f2, ... f9] ]
+            # Pure Python model expects List[List[float]] and returns List[int]
             prediction = self._ml_model.predict([features])
 
-            # Result is usually an array, e.g., ["sunny"]
+            # Result is 1 if rain expected, 0 otherwise
             if len(prediction) > 0:
-                result = str(prediction[0])
-                _LOGGER.debug("ML Inference result: %s", result)
+                is_rain = bool(prediction[0])
+                result = "rainy" if is_rain else "sunny"
+                _LOGGER.debug(
+                    "ML Inference result: %s (rain expected: %s)", result, is_rain
+                )
                 return result
 
         except Exception as err:

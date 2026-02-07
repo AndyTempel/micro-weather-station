@@ -67,19 +67,13 @@ async def test_train_model_success(
             return_value=mock_history_states,
         ),
         patch("joblib.dump") as mock_dump,
-        patch("sklearn.ensemble.RandomForestClassifier") as mock_clf_class,
     ):
-        mock_clf = MagicMock()
-        mock_clf.score.return_value = 0.9
-        mock_clf.feature_importances_ = [0.1] * 9
-        mock_clf_class.return_value = mock_clf
-
         result = await hass.async_add_executor_job(
             train_model, hass, sensor_map, "mock_path.joblib"
         )
 
         assert result["success"] is True
-        assert result["accuracy"] == 0.9
+        assert isinstance(result["accuracy"], float)
         assert "last_trained" in result
         mock_dump.assert_called_once()
 
@@ -116,7 +110,7 @@ async def test_train_model_exception(
             return_value=mock_history_states,
         ),
         patch(
-            "sklearn.ensemble.RandomForestClassifier",
+            "custom_components.micro_weather.trainer.RandomForest.fit",
             side_effect=Exception("Training error"),
         ),
     ):
